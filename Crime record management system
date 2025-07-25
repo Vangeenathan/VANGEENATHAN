@@ -1,0 +1,224 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import mysql.connector
+
+# ------------------ Database Connection ------------------ #
+def connect_db():
+    return mysql.connector.connect(
+        host="localhost",
+        user="root",
+        password="password",  # Replace with your MySQL password
+        database="crime_db"     # Replace with your DB name
+    )
+
+# ------------------ Main Application ------------------ #
+class CrimeApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("Crime Record Management System")
+        self.root.geometry("600x400")
+        self.show_home()
+
+    def clear_window(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
+
+    def show_home(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Crime Record Management System", font=("Arial", 18, "bold")).pack(pady=20)
+        ttk.Button(self.root, text="Login", command=self.show_login).pack(pady=10)
+        ttk.Button(self.root, text="Register", command=self.show_register).pack(pady=10)
+
+    def show_register(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Register", font=("Arial", 16)).pack(pady=10)
+
+        username = tk.StringVar()
+        password = tk.StringVar()
+
+        ttk.Label(self.root, text="Username:").pack()
+        ttk.Entry(self.root, textvariable=username).pack()
+
+        ttk.Label(self.root, text="Password:").pack()
+        ttk.Entry(self.root, textvariable=password, show="*").pack()
+
+        def register_user():
+            if not username.get() or not password.get():
+                messagebox.showerror("Error", "All fields are required")
+                return
+            db = connect_db()
+            cursor = db.cursor()
+            cursor.execute("INSERT INTO users (username, password) VALUES (%s, %s)", (username.get(), password.get()))
+            db.commit()
+            db.close()
+            messagebox.showinfo("Success", "Registered Successfully")
+            self.show_login()
+
+        ttk.Button(self.root, text="Register", command=register_user).pack(pady=10)
+        ttk.Button(self.root, text="Back", command=self.show_home).pack(pady=5)
+
+    def show_login(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Login", font=("Arial", 16)).pack(pady=10)
+
+        username = tk.StringVar()
+        password = tk.StringVar()
+
+        ttk.Label(self.root, text="Username:").pack()
+        ttk.Entry(self.root, textvariable=username).pack()
+
+        ttk.Label(self.root, text="Password:").pack()
+        ttk.Entry(self.root, textvariable=password, show="*").pack()
+
+        def login_user():
+            db = connect_db()
+            cursor = db.cursor()
+            cursor.execute("SELECT * FROM users WHERE username=%s AND password=%s", (username.get(), password.get()))
+            if cursor.fetchone():
+                self.show_dashboard()
+            else:
+                messagebox.showerror("Error", "Invalid Credentials")
+            db.close()
+
+        ttk.Button(self.root, text="Login", command=login_user).pack(pady=10)
+        ttk.Button(self.root, text="Back", command=self.show_home).pack(pady=5)
+
+    def show_dashboard(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Dashboard", font=("Arial", 16)).pack(pady=10)
+
+        ttk.Button(self.root, text="Add Crime Record", command=self.add_crime).pack(pady=5)
+        ttk.Button(self.root, text="View All Records", command=self.view_crimes).pack(pady=5)
+        ttk.Button(self.root, text="Search Crime", command=self.search_crime).pack(pady=5)
+        ttk.Button(self.root, text="Update Record", command=self.update_crime).pack(pady=5)
+        ttk.Button(self.root, text="Delete Record", command=self.delete_crime).pack(pady=5)
+        ttk.Button(self.root, text="Logout", command=self.show_home).pack(pady=10)
+
+    def add_crime(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Add Crime Record", font=("Arial", 16)).pack(pady=10)
+
+        crime_type = tk.StringVar()
+        location = tk.StringVar()
+        date = tk.StringVar()
+
+        ttk.Label(self.root, text="Crime Type:").pack()
+        ttk.Entry(self.root, textvariable=crime_type).pack()
+
+        ttk.Label(self.root, text="Location:").pack()
+        ttk.Entry(self.root, textvariable=location).pack()
+
+        ttk.Label(self.root, text="Date (YYYY-MM-DD):").pack()
+        ttk.Entry(self.root, textvariable=date).pack()
+
+        def save_crime():
+            db = connect_db()
+            cursor = db.cursor()
+            cursor.execute("INSERT INTO crime_records (crime_type, location, date) VALUES (%s, %s, %s)",
+                           (crime_type.get(), location.get(), date.get()))
+            db.commit()
+            db.close()
+            messagebox.showinfo("Success", "Crime record added.")
+            self.show_dashboard()
+
+        ttk.Button(self.root, text="Save", command=save_crime).pack(pady=10)
+        ttk.Button(self.root, text="Back", command=self.show_dashboard).pack(pady=5)
+
+    def view_crimes(self):
+        self.clear_window()
+        ttk.Label(self.root, text="All Crime Records", font=("Arial", 16)).pack(pady=10)
+        tree = ttk.Treeview(self.root, columns=("ID", "Type", "Location", "Date"), show="headings")
+        tree.heading("ID", text="ID")
+        tree.heading("Type", text="Type")
+        tree.heading("Location", text="Location")
+        tree.heading("Date", text="Date")
+        tree.pack(expand=True, fill='both')
+
+        db = connect_db()
+        cursor = db.cursor()
+        cursor.execute("SELECT * FROM crime_records")
+        for row in cursor.fetchall():
+            tree.insert("", "end", values=row)
+        db.close()
+        ttk.Button(self.root, text="Back", command=self.show_dashboard).pack(pady=5)
+
+    def search_crime(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Search Crime by Type", font=("Arial", 16)).pack(pady=10)
+        crime_type = tk.StringVar()
+        ttk.Entry(self.root, textvariable=crime_type).pack()
+
+        def do_search():
+            tree = ttk.Treeview(self.root, columns=("ID", "Type", "Location", "Date"), show="headings")
+            tree.heading("ID", text="ID")
+            tree.heading("Type", text="Type")
+            tree.heading("Location", text="Location")
+            tree.heading("Date", text="Date")
+            tree.pack(expand=True, fill='both')
+
+            db = connect_db()
+            cursor = db.cursor()
+            cursor.execute("SELECT * FROM crime_records WHERE crime_type = %s", (crime_type.get(),))
+            for row in cursor.fetchall():
+                tree.insert("", "end", values=row)
+            db.close()
+
+        ttk.Button(self.root, text="Search", command=do_search).pack(pady=5)
+        ttk.Button(self.root, text="Back", command=self.show_dashboard).pack(pady=5)
+
+    def update_crime(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Update Crime Record", font=("Arial", 16)).pack(pady=10)
+        id_ = tk.StringVar()
+        crime_type = tk.StringVar()
+        location = tk.StringVar()
+        date = tk.StringVar()
+
+        ttk.Label(self.root, text="Crime ID to Update:").pack()
+        ttk.Entry(self.root, textvariable=id_).pack()
+        ttk.Label(self.root, text="New Type:").pack()
+        ttk.Entry(self.root, textvariable=crime_type).pack()
+        ttk.Label(self.root, text="New Location:").pack()
+        ttk.Entry(self.root, textvariable=location).pack()
+        ttk.Label(self.root, text="New Date:").pack()
+        ttk.Entry(self.root, textvariable=date).pack()
+
+        def update_record():
+            db = connect_db()
+            cursor = db.cursor()
+            cursor.execute("UPDATE crime_records SET crime_type=%s, location=%s, date=%s WHERE id=%s",
+                           (crime_type.get(), location.get(), date.get(), id_.get()))
+            db.commit()
+            db.close()
+            messagebox.showinfo("Success", "Crime record updated.")
+            self.show_dashboard()
+
+        ttk.Button(self.root, text="Update", command=update_record).pack(pady=10)
+        ttk.Button(self.root, text="Back", command=self.show_dashboard).pack(pady=5)
+
+    def delete_crime(self):
+        self.clear_window()
+        ttk.Label(self.root, text="Delete Crime Record", font=("Arial", 16)).pack(pady=10)
+        id_ = tk.StringVar()
+        ttk.Label(self.root, text="Enter Crime ID to Delete:").pack()
+        ttk.Entry(self.root, textvariable=id_).pack()
+
+        def delete_record():
+            db = connect_db()
+            cursor = db.cursor()
+            cursor.execute("DELETE FROM crime_records WHERE id = %s", (id_.get(),))
+            db.commit()
+            db.close()
+            messagebox.showinfo("Deleted", "Record deleted.")
+            self.show_dashboard()
+
+        ttk.Button(self.root, text="Delete", command=delete_record).pack(pady=10)
+        ttk.Button(self.root, text="Back", command=self.show_dashboard).pack(pady=5)
+
+# ------------------ Run the Application ------------------ #
+if __name__ == "__main__":
+    root = tk.Tk()
+    style = ttk.Style(root)
+    style.theme_use('clam')  # Modern look
+    app = CrimeApp(root)
+    root.mainloop(
